@@ -1,0 +1,10 @@
+# Project-scoped Codex MCP for Sympho (trusted projects only).
+# Sympho must be running with Local MCP enabled on this Mac.
+# Set SYMPHO_MCP_TOKEN to the bearer token from Sympho Settings, or use
+# SYMPHO_MCP_TOKEN=sympho-dev-test-token when running via script/build_and_run.sh.
+
+[mcp_servers.sympho]
+url = "http://127.0.0.1:8765/mcp"
+bearer_token_env_var = "SYMPHO_MCP_TOKEN"
+default_tools_approval_mode = "prompt"
+startup_timeout_sec = 15

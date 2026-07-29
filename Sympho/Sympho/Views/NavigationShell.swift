@@ -11,6 +11,7 @@ import SwiftData
 enum NavSection: String, CaseIterable, Identifiable {
     case dashboard
     case inbox
+    case lab
     case domains
     case projects
     case readingList
@@ -23,6 +24,7 @@ enum NavSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: return "Home"
         case .inbox: return "Inbox"
+        case .lab: return "Learning Lab"
         case .domains: return "Domains"
         case .projects: return "Projects"
         case .readingList: return "Reading List"
@@ -35,6 +37,7 @@ enum NavSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: return "Active focus and queue"
         case .inbox: return "Unsorted captures"
+        case .lab: return "Think, connect, understand"
         case .domains: return "Fields of study"
         case .projects: return "Output workspaces"
         case .readingList: return "Books you are reading"
@@ -47,6 +50,7 @@ enum NavSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: return "house"
         case .inbox: return "tray"
+        case .lab: return "square.grid.3x3.square"
         case .domains: return "books.vertical"
         case .projects: return "folder"
         case .readingList: return "book.closed.fill"
@@ -59,11 +63,12 @@ enum NavSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: return "1"
         case .inbox: return "2"
-        case .domains: return "3"
-        case .projects: return "4"
-        case .readingList: return "5"
-        case .planner: return "6"
-        case .library: return "7"
+        case .lab: return "3"
+        case .domains: return "4"
+        case .projects: return "5"
+        case .readingList: return "6"
+        case .planner: return "7"
+        case .library: return "8"
         }
     }
 }
@@ -79,6 +84,7 @@ struct NavigationShell: View {
     @State private var selectedProject: Project?
     @State private var expandedDomainIDs: Set<UUID> = []
     @State private var expandedTrackIDs: Set<UUID> = []
+    @State private var isLearningSpacesExpanded = false
     @State private var showQuickCapture = false
     @State private var quickCapturePendingFiles: [URL] = []
     @State private var isGlobalFileDropTarget = false
@@ -203,38 +209,75 @@ struct NavigationShell: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    SidebarTodayPlanCard()
-                        .padding(.bottom, 10)
-
+                VStack(alignment: .leading, spacing: 14) {
                     SidebarSearchRow(action: toggleGlobalSearch)
                         .keyboardShortcut("f", modifiers: [.command])
 
-                    navRow(.dashboard)
-                    navRow(.inbox)
+                    SidebarCaptureRow {
+                        quickCapturePendingFiles = []
+                        showQuickCapture = true
+                    }
 
-                    domainsTreeSection
+                    SidebarTodayPlanCard(
+                        onOpenPlanner: { selectSection(.planner) },
+                        onOpenReading: { selectSection(.readingList) },
+                        onOpenNode: openNode
+                    )
 
-                    MinimalDivider()
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
-
-                    navRow(.projects)
-                    navRow(.readingList)
-                    navRow(.planner)
-                    navRow(.library)
+                    sidebarNavigationSection
+                    learningSpacesSection
+                    organizeSection
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 8)
-                .padding(.bottom, 14)
+                .padding(.horizontal, 12)
+                .padding(.top, 14)
+                .padding(.bottom, 20)
             }
             .scrollIndicators(.never)
 
             sidebarFooter
         }
-        .padding(.top, 10)
         .frame(minWidth: SymphoTheme.sidebarWidth)
-        .background(.thinMaterial)
+        .background(SymphoTheme.controlBackground.opacity(0.92))
+    }
+
+    private var sidebarNavigationSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SidebarGroupLabel("Navigate")
+            navRow(.dashboard)
+            navRow(.inbox)
+        }
+    }
+
+    private var learningSpacesSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SidebarGroupLabel("Learning")
+            navRow(.lab)
+            SidebarDisclosureHeader(
+                title: "Learning spaces",
+                isSelected: selectedSection == .domains && !isShowingSettings,
+                isExpanded: isLearningSpacesExpanded,
+                onToggle: {
+                    withAnimation(.snappy(duration: 0.16)) {
+                        isLearningSpacesExpanded.toggle()
+                    }
+                }
+            )
+            .keyboardShortcut("4", modifiers: [.command])
+
+            if isLearningSpacesExpanded {
+                ForEach(domains) { domain in
+                    domainTreeItem(domain)
+                }
+            }
+        }
+    }
+
+    private var organizeSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SidebarGroupLabel("Organize")
+            navRow(.projects)
+            navRow(.library)
+        }
     }
 
     private func navRow(_ section: NavSection) -> some View {
@@ -252,12 +295,12 @@ struct NavigationShell: View {
     private var domainsTreeSection: some View {
         VStack(alignment: .leading, spacing: 2) {
             SidebarSectionHeader(
-                title: "Domains",
+                title: "Learning spaces",
                 isSelected: selectedSection == .domains && selectedDomain == nil && !isShowingSettings,
                 onSelect: openDomainsRoot,
                 onAdd: openDomainsRoot
             )
-            .keyboardShortcut("3", modifiers: [.command])
+            .keyboardShortcut("4", modifiers: [.command])
 
             ForEach(domains) { domain in
                 domainTreeItem(domain)
@@ -278,7 +321,10 @@ struct NavigationShell: View {
             isExpanded: isExpanded,
             titleWeight: .medium,
             onToggle: { toggleDomain(domain) },
-            onSelect: { openDomain(domain) }
+            onSelect: {
+                openDomain(domain)
+                toggleDomain(domain)
+            }
         )
 
         if isExpanded {
@@ -302,13 +348,17 @@ struct NavigationShell: View {
         SidebarTreeRow(
             title: track.title,
             icon: "point.topleft.down.curvedto.point.bottomright.up",
+            emoji: track.emoji.isEmpty ? SidebarTrackEmoji.forTitle(track.title) : track.emoji,
             indent: 1,
             isSelected: isTrackSelected(track),
             trailing: nil,
             hasDisclosure: !modules.isEmpty,
             isExpanded: isExpanded,
             onToggle: { toggleTrack(track) },
-            onSelect: { openTrack(track) }
+            onSelect: {
+                openTrack(track)
+                toggleTrack(track)
+            }
         )
 
         if isExpanded {
@@ -422,65 +472,45 @@ struct NavigationShell: View {
     }
 
     private var sidebarFooter: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             MinimalDivider()
 
-            if devCaptureEnabled {
+            HStack(spacing: 4) {
                 Button {
-                    syncNavigationContext()
-                    showDevCapture = true
+                    withAnimation(.snappy(duration: 0.18)) {
+                        isShowingSettings = true
+                        selectedDomain = nil
+                    }
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "hammer.fill")
-                        Text("Dev Capture")
-                        Spacer()
-                        Text("⌘⇧K")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(SymphoTheme.secondaryText)
+                        Image(systemName: "gearshape")
+                        Text("Settings")
                     }
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(SymphoSecondaryButtonStyle())
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-                .help("Developer capture for bugs and ideas")
-            }
+                .buttonStyle(SidebarUtilityButtonStyle())
+                .foregroundStyle(.red)
+                .help("Settings")
 
-            Button {
-                quickCapturePendingFiles = []
-                showQuickCapture.toggle()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus")
-                    Text("Capture")
-                    Spacer()
-                    Text("⌘K")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.72))
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(SymphoPrimaryButtonStyle())
-            .keyboardShortcut("k", modifiers: [.command])
-            .help("Quick capture")
+                Spacer(minLength: 0)
 
-            Button {
-                withAnimation(.snappy(duration: 0.18)) {
-                    isShowingSettings = true
-                    selectedDomain = nil
+                if devCaptureEnabled {
+                    Button {
+                        syncNavigationContext()
+                        showDevCapture = true
+                    } label: {
+                        Image(systemName: "hammer")
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(SymphoTheme.tertiaryText)
+                    .keyboardShortcut("k", modifiers: [.command, .shift])
+                    .help("Developer capture")
+                    .accessibilityLabel("Developer capture")
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "gearshape")
-                    Text("Settings")
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(SymphoSecondaryButtonStyle())
-            .help("Settings")
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 18)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 14)
     }
 
     private var detailContainer: some View {
@@ -520,6 +550,10 @@ struct NavigationShell: View {
             NavigationStack { InboxView() }
                 .tabItem { Label(NavSection.inbox.title, systemImage: NavSection.inbox.iconName) }
                 .tag(NavSection.inbox)
+
+            NavigationStack { LearningLabView() }
+                .tabItem { Label(NavSection.lab.title, systemImage: NavSection.lab.iconName) }
+                .tag(NavSection.lab)
 
             NavigationStack {
                 DomainsView(
@@ -571,6 +605,8 @@ struct NavigationShell: View {
                 )
             case .inbox:
                 InboxView()
+            case .lab:
+                LearningLabView()
             case .domains:
                 DomainsView(
                     selectedDomain: $selectedDomain,
@@ -776,6 +812,7 @@ struct NavigationShell: View {
         setReturnFromCurrentSection(entryKind: .domain(domain.id))
 
         withAnimation(.snappy(duration: 0.18)) {
+            isLearningSpacesExpanded = true
             selectedSection = .domains
             selectedDomain = domain
             selectedTrack = nil
@@ -953,6 +990,55 @@ struct NavigationShell: View {
 }
 
 #if os(macOS)
+private struct SidebarGroupLabel: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(0.7)
+            .foregroundStyle(SymphoTheme.secondaryText.opacity(0.86))
+            .padding(.horizontal, 8)
+            .padding(.bottom, 3)
+    }
+}
+
+private struct SidebarCaptureRow: View {
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 20)
+                Text("Capture")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer(minLength: 0)
+                Text("⌘K")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(SymphoTheme.tertiaryText)
+            }
+            .foregroundStyle(SymphoTheme.primaryText)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background {
+                RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous)
+                    .fill(isHovering ? SymphoTheme.primaryText.opacity(0.12) : SymphoTheme.primaryText.opacity(0.08))
+            }
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut("k", modifiers: [.command])
+        .onHover { isHovering = $0 }
+        .help("Quick capture")
+    }
+}
+
 private struct SidebarSearchRow: View {
     let action: () -> Void
 
@@ -963,12 +1049,12 @@ private struct SidebarSearchRow: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(SymphoTheme.secondaryText)
+                    .foregroundStyle(SymphoTheme.primaryText.opacity(0.72))
                     .frame(width: 20)
 
                 Text("Search")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(SymphoTheme.secondaryText)
+                    .foregroundStyle(SymphoTheme.primaryText.opacity(0.78))
 
                 Spacer(minLength: 8)
 
@@ -976,12 +1062,16 @@ private struct SidebarSearchRow: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(SymphoTheme.tertiaryText)
             }
-            .padding(.vertical, 7)
+            .padding(.vertical, 8)
             .padding(.horizontal, 10)
             .contentShape(RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous))
             .background {
                 RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous)
-                    .fill(isHovering ? SymphoTheme.elevatedCanvas.opacity(0.42) : .clear)
+                    .fill(isHovering ? Color.white.opacity(0.96) : Color.white.opacity(0.80))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous)
+                    .stroke(SymphoTheme.dividerColor.opacity(0.92), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
@@ -1002,12 +1092,12 @@ private struct SidebarRow: View {
             HStack(spacing: 10) {
                 Image(systemName: section.iconName)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.secondaryText)
+                    .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.primaryText.opacity(0.68))
                     .frame(width: 20)
 
                 Text(section.title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.secondaryText)
+                    .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.primaryText.opacity(0.74))
 
                 Spacer(minLength: 8)
             }
@@ -1029,16 +1119,104 @@ private struct SidebarRow: View {
 
     private var rowBackground: Color {
         if isSelected {
-            return SymphoTheme.elevatedCanvas.opacity(0.82)
+            return SymphoTheme.primaryText.opacity(0.10)
         }
 
         if isHovering {
-            return SymphoTheme.elevatedCanvas.opacity(0.42)
+            return SymphoTheme.primaryText.opacity(0.055)
         }
 
         return .clear
     }
 
+}
+
+private struct SidebarDisclosureHeader: View {
+    let title: String
+    let isSelected: Bool
+    let isExpanded: Bool
+    let onToggle: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 4) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .frame(width: 18, height: 24)
+                    .foregroundStyle(SymphoTheme.primaryText.opacity(0.48))
+
+                HStack(spacing: 8) {
+                    Image(systemName: "books.vertical")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 18)
+                    Text(title)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.primaryText.opacity(0.74))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isExpanded ? "Collapse learning spaces" : "Expand learning spaces")
+        .padding(.trailing, 10)
+        .padding(.vertical, 4)
+        .background {
+            RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous)
+                .fill(rowBackground)
+        }
+        .onHover { isHovering = $0 }
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return SymphoTheme.primaryText.opacity(0.10) }
+        if isHovering { return SymphoTheme.primaryText.opacity(0.055) }
+        return .clear
+    }
+}
+
+private struct SidebarCollectionRow: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.secondaryText)
+                    .frame(width: 20)
+
+                Text(title)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.secondaryText)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 6)
+            .padding(.leading, 28)
+            .padding(.trailing, 10)
+            .contentShape(RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous))
+            .background {
+                RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous)
+                    .fill(rowBackground)
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return SymphoTheme.primaryText.opacity(0.10) }
+        if isHovering { return SymphoTheme.primaryText.opacity(0.055) }
+        return .clear
+    }
 }
 
 private struct SidebarSectionHeader: View {
@@ -1084,6 +1262,7 @@ private struct SidebarSectionHeader: View {
 private struct SidebarTreeRow: View {
     let title: String
     let icon: String
+    var emoji: String? = nil
     let indent: Int
     let isSelected: Bool
     var trailing: String? = nil
@@ -1104,14 +1283,20 @@ private struct SidebarTreeRow: View {
 
             Button(action: onSelect) {
                 HStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(.system(size: isRoot ? 14 : 12, weight: .medium))
-                        .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.secondaryText)
-                        .frame(width: 18)
+                    if let emoji, !emoji.isEmpty {
+                        Text(emoji)
+                            .font(.system(size: isRoot ? 13 : 12))
+                            .frame(width: 18)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: isRoot ? 14 : 12, weight: .medium))
+                            .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.primaryText.opacity(0.66))
+                            .frame(width: 18)
+                    }
 
                     Text(title)
                         .font(.system(size: isRoot ? 13 : 12, weight: isSelected ? .semibold : titleWeight))
-                        .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.secondaryText)
+                        .foregroundStyle(isSelected ? SymphoTheme.primaryText : SymphoTheme.primaryText.opacity(0.72))
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
@@ -1159,12 +1344,52 @@ private struct SidebarTreeRow: View {
 
     private var rowBackground: Color {
         if isSelected {
-            return SymphoTheme.elevatedCanvas.opacity(0.82)
+            return SymphoTheme.primaryText.opacity(0.10)
         }
         if isHovering {
-            return SymphoTheme.elevatedCanvas.opacity(0.42)
+            return SymphoTheme.primaryText.opacity(0.055)
         }
         return .clear
+    }
+}
+
+private struct SidebarUtilityButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(SymphoTheme.secondaryText)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background {
+                RoundedRectangle(cornerRadius: SymphoTheme.controlRadius, style: .continuous)
+                    .fill(configuration.isPressed ? SymphoTheme.primaryText.opacity(0.09) : .clear)
+            }
+    }
+}
+
+private enum SidebarTrackEmoji {
+    static func forTitle(_ title: String) -> String {
+        let value = title.lowercased()
+        if value.contains("math") || value.contains("calculus") { return "∑" }
+        if value.contains("physics") { return "⚛️" }
+        if value.contains("mechanic") || value.contains("cad") { return "⚙️" }
+        if value.contains("control") { return "🎛️" }
+        if value.contains("perception") || value.contains("vision") { return "👁️" }
+        if value.contains("planning") || value.contains("reinforcement") { return "🧠" }
+        if value.contains("programming") || value.contains("ros") { return "💻" }
+        if value.contains("electronic") || value.contains("embedded") { return "🔌" }
+        if value.contains("architecture") || value.contains("devops") { return "🏗️" }
+        if value.contains("backend") || value.contains("server") { return "🗄️" }
+        if value.contains("app development") { return "📱" }
+        if value.contains("system") || value.contains("c & c++") { return "🧩" }
+        if value.contains("llm") || value.contains("machine learning") { return "✨" }
+        if value.contains("grammar") || value.contains("speaking") { return "🗣️" }
+        if value.contains("design") { return "🎨" }
+        if value.contains("growth") || value.contains("marketing") { return "📈" }
+        if value.contains("finance") { return "💸" }
+        if value.contains("leadership") || value.contains("operations") { return "🧭" }
+        if value.contains("product") { return "🧱" }
+        return "•"
     }
 }
 #endif

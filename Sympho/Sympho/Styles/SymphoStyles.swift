@@ -42,7 +42,7 @@ struct SymphoTheme {
     static let cornerRadius: CGFloat = 8
     static let controlRadius: CGFloat = 7
     static let outerPadding: CGFloat = 28
-    static let sidebarWidth: CGFloat = 236
+    static let sidebarWidth: CGFloat = 248
 }
 
 // MARK: - Note Typography (markdown editor only)

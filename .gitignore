@@ -42,3 +42,6 @@ Package.resolved
 
 # Local MCP config — contains Sympho bearer token, do not commit
 .mcp.json
+
+# Battito
+.context/

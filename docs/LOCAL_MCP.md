@@ -22,6 +22,27 @@ Attachments may be imported only from security-scoped approved roots. Paths are 
 
 An isolated development instance can use `SYMPHO_IN_MEMORY_STORE=1`, `SYMPHO_MCP_ENABLED=1`, and `SYMPHO_MCP_TOKEN=<test token>`. These overrides are intended for protocol tests and do not replace production Keychain authentication.
 
+## Codex
+
+Sympho is an **MCP connector**, not a curated Codex App (those are things like Notion or GitHub from OpenAI's plugin directory).
+
+When this repo is open in **Codex.app** or the Codex CLI:
+
+1. The project is already trusted in `~/.codex/config.toml`.
+2. `.codex/config.toml` registers `[mcp_servers.sympho]` for this project.
+3. Open **Settings → MCP** in Codex. Sympho appears there; it may show as disconnected until the macOS app is running.
+4. Export `SYMPHO_MCP_TOKEN` with the bearer token from Sympho Settings (or your dev override).
+
+Codex does not use `.claude/launch.json`. The **Run** button in the Codex header comes from `.codex/environments/environment.toml`.
+
+## Cursor
+
+Project MCP lives in `.cursor/mcp.json` (local, not committed). Cursor loads it when the Sympho app is running and MCP is enabled.
+
+## Cursor Cloud
+
+Cloud agents run on a remote VM. They cannot reach `http://127.0.0.1:8765` on your Mac, so Sympho is **not** available as a cloud connector today. A future hosted Sympho MCP (public URL + OAuth) would be required for that.
+
 ## Remote evolution
 
-The transport/authentication layer is intentionally separate from the Codable DTOs, tool catalog, workspace service, validation, audit, and undo logic. A future hosted MCP should reuse those layers, replace loopback bearer authentication with user-scoped OAuth, and replace direct local SwiftData access with an authorized persistence adapter.
+The transport/authentication layer is intentionally separate from the Codable DTOs, tool catalog, workspace service, validation, audit, and undo logic. A future hosted MCP should reuse those layers, replace loopback bearer authentication with user-scoped OAuth, and replace direct local SwiftData access with an authorized persistence adapter. That hosted endpoint is what would unlock Codex remote sessions and Cursor Cloud.

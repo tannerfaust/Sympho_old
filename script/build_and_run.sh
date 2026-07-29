@@ -26,8 +26,22 @@ open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
 
+install_app() {
+  local dest="/Applications/$APP_NAME.app"
+  rm -rf "$dest"
+  cp -R "$APP_BUNDLE" "$dest"
+  echo "Installed $dest"
+}
+
 case "$MODE" in
   run)
+    open_app
+    ;;
+  install)
+    install_app
+    ;;
+  install-run|install-and-run)
+    install_app
     open_app
     ;;
   --debug|debug)
@@ -47,7 +61,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|install|install-run|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

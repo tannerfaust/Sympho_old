@@ -1,6 +1,18 @@
 {
   "version": "0.0.1",
+  "autoVerify": false,
   "configurations": [
+    {
+      "name": "sympho",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["script/build_and_run.sh", "run"],
+      "cwd": "${workspaceFolder}",
+      "port": 8765,
+      "env": {
+        "SYMPHO_MCP_ENABLED": "1",
+        "SYMPHO_MCP_TOKEN": "sympho-dev-test-token"
+      }
+    },
     {
       "name": "eventobot",
       "runtimeExecutable": "python3",

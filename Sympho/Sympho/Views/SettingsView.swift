@@ -135,7 +135,7 @@ struct SettingsView: View {
                         DevCaptureSettings.isEnabled = newValue
                     }
 
-                Text("Shows a Dev Capture button above Capture. Log bugs, ideas, and design notes with automatic context from where you are in Sympho.")
+                Text("Shows a compact Dev Capture control in the sidebar. Log bugs, ideas, and design notes with automatic context from where you are in Sympho.")
                     .font(.system(size: 11))
                     .foregroundStyle(SymphoTheme.secondaryText)
 

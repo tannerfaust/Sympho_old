@@ -143,6 +143,39 @@ enum ResourceType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum LabItemKind: String, Codable, CaseIterable, Identifiable {
+    case note
+    case question
+    case concept
+    case source
+    case video
+    case sketch
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .note: return "Note"
+        case .question: return "Question"
+        case .concept: return "Concept"
+        case .source: return "Source"
+        case .video: return "Video"
+        case .sketch: return "Sketch"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .note: return "note.text"
+        case .question: return "questionmark.bubble"
+        case .concept: return "lightbulb"
+        case .source: return "doc.richtext"
+        case .video: return "play.rectangle.fill"
+        case .sketch: return "pencil.and.scribble"
+        }
+    }
+}
+
 /// Workflow status for a Library entry: To Review → Reading → Done, plus Archived.
 enum LibraryStatus: String, Codable, CaseIterable, Identifiable {
     case toReview = "to_review"
@@ -759,6 +792,110 @@ final class Resource: Identifiable, Hashable {
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+}
+
+@Model
+final class LabBoard: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var title: String
+    var focusQuestion: String
+    var createdAt: Date
+    var updatedAt: Date
+
+    @Relationship(deleteRule: .cascade, inverse: \LabItem.board) var items: [LabItem] = []
+    @Relationship(deleteRule: .cascade, inverse: \LabConnection.board) var connections: [LabConnection] = []
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        focusQuestion: String = ""
+    ) {
+        self.id = id
+        self.title = title
+        self.focusQuestion = focusQuestion
+        self.createdAt = Date()
+        self.updatedAt = Date()
+    }
+}
+
+@Model
+final class LabItem: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var kindValue: String
+    var title: String
+    var bodyText: String
+    var urlString: String
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
+    var colorHex: String
+    var drawingData: Data?
+    var createdAt: Date
+    var updatedAt: Date
+
+    var board: LabBoard?
+    var resource: Resource?
+
+    var kind: LabItemKind {
+        get { LabItemKind(rawValue: kindValue) ?? .note }
+        set { kindValue = newValue.rawValue }
+    }
+
+    init(
+        id: UUID = UUID(),
+        kind: LabItemKind,
+        title: String,
+        bodyText: String = "",
+        urlString: String = "",
+        x: Double,
+        y: Double,
+        width: Double = 280,
+        height: Double = 200,
+        colorHex: String = "#FFF7CF",
+        board: LabBoard? = nil,
+        resource: Resource? = nil
+    ) {
+        self.id = id
+        self.kindValue = kind.rawValue
+        self.title = title
+        self.bodyText = bodyText
+        self.urlString = urlString
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.colorHex = colorHex
+        self.createdAt = Date()
+        self.updatedAt = Date()
+        self.board = board
+        self.resource = resource
+    }
+}
+
+@Model
+final class LabConnection: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var sourceItemID: UUID
+    var targetItemID: UUID
+    var label: String
+    var createdAt: Date
+    var board: LabBoard?
+
+    init(
+        id: UUID = UUID(),
+        sourceItemID: UUID,
+        targetItemID: UUID,
+        label: String = "supports",
+        board: LabBoard? = nil
+    ) {
+        self.id = id
+        self.sourceItemID = sourceItemID
+        self.targetItemID = targetItemID
+        self.label = label
+        self.createdAt = Date()
+        self.board = board
     }
 }
 
